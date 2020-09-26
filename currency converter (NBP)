@@ -1,12 +1,20 @@
+
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton
 import pandas as pd
+from pandas.tseries.offsets import BDay
 import requests
 from lxml import html
 from furl import furl
 import datetime
 import time
+import sys
+import os
+import tkinter as tk
+import calendar
+os.environ['QT_QPA_PLATFORM']='offscreen'
+#------------------------------------------------------ program ------------------------------------------------------ 
 
-
-class Input():
+class Input:
     def __init__(self, file):
         self.file = file  # plik
         self.kwoty = []  # kwoty do przeliczenia
@@ -37,74 +45,118 @@ class Input():
         return self.daty
 
 
-class Dodatkowe():
+class Dodatkowe:
     def __init__(self, data):
-        self.dni_wolne = ['01.01.20', '06.01.20', '12.04.20', '13.04.20', '01.05.20', '03.05.20', '31.05.20',
-                          '11.06.20']
+        self.dni_wolne = ['1.1.20', '6.1.20', '12.4.20', '13.4.20', '1.5.20', '3.5.20', '31.5.20',
+                          '11.6.20','15.8.20','1.11.20','11.11.20','25.12.20','26.12.20'] #swieta do czerwca włącznie
         self.data = data
         self.year = int(self.data.split('.')[2])
         self.month = int(self.data.split('.')[1])
         self.day = int(self.data.split('.')[0])
         self.ilosc = {'1': 21, '2': 20, '3': 22, '4': 21, '5': 20, '6': 21, '7': 23, '8': 20, '9': 22, '10': 22,
-                      '11': 20, '12': 21}
+                      '11': 20, '12': 21} #ile dni w miesiącu pracujących
         self.trzjeden = [1, 3, 5, 7, 8, 10, 12]
 
-    def czy_wolne(self, data):
+    def czy_wolne(self, data): #sprawdza czy pracujący - zwraca true przy pracujący 
         if data in self.dni_wolne:
             return False
         dat = datetime.date(int(data.split('.')[2]), int(data.split('.')[1]), int(data.split('.')[0]))
-        if dat.weekday() == 5 or dat.weekday() == 6:
+        if calendar.weekday(int(data.split('.')[2]), int(data.split('.')[1]), int(data.split('.')[0])) == 5 or calendar.weekday(int(data.split('.')[2]), int(data.split('.')[1]), int(data.split('.')[0])) == 6:
             return False
         return True
 
-    def policz(self):
-        ile_przed = 0
-        for i in range(int(self.month) - 1):
-            ile_przed += self.ilosc[str(i + 1)]
-        for i in range(self.day):
-            dzien = i + 1
-            data = '{}.{}.{}'.format(dzien, self.month, self.year)
-            if self.czy_wolne(str(data)):
-                ile_przed += 1
-        return ile_przed
 
     def daj_kod(self):
-        bylo = self.policz()
-        a = 1
-        while True:
-            if int(self.day) == 1:
-                month = int(self.month) - 1
-                if month in self.trzjeden:
-                    day_before = 31
-                elif month == 2:
-                    day_before = 29
+        z=0
+        ile_przed = 0
+        a = 0
+        if int(self.day) == 1:
+            month = int(self.month) - 1
+            if month in self.trzjeden:
+                day_before = 31
+            elif month == 2:
+                day_before = 29
+            else:
+                day_before = 30
+            data_before = '{}.{}.{}'.format(day_before, month, self.year)
+            for q in range(10):
+                if self.czy_wolne(str(data_before)):
+                    for i in range(int(month)):
+                        ile_przed += self.ilosc[str(i + 1)]
+                    #ile_przed-=1
+                    dt = calendar.weekday(self.year,self.month,self.day)
+                    if dt  == 5:
+                        z = 1
+                        #ile_przed -=1
+                    elif dt == 6:
+                        z = 2
+                    data = '{}.{}.{}'.format(str(int(day_before)), month, self.year)
+                    if ile_przed < 10:
+                        kod = 'a00{}z'
+                    elif ile_przed < 100:
+                        kod = 'a0{}z'
+                    else:
+                        kod = 'a{}z'
+                    gotowe = kod.format(ile_przed)
+                    
+                    dat = data.split('.')
+                    odw = dat[::-1]
+                    nowe = ''
+                    for i in range(len(odw)):
+                        if int(odw[i]) < 10:
+                            odw[i] = '0{}'.format(odw[i])
+                        nowe += odw[i]
+                    dane = gotowe + nowe
+                    return dane
                 else:
-                    day_before = 30
-                data_before = '{}.{}.{}'.format(day_before, month, self.year)
-            else:
-                day_before = self.day - a
-                data_before = '{}.{}.{}'.format(day_before, self.month, self.year)
-            if self.czy_wolne(self.data):
-                bylo = bylo - a
-            if self.czy_wolne(data_before):
-                kod = 'a0{}z'
-                gotowe = kod.format(bylo)
-                data = data_before
-                dat = data.split('.')
-                odw = dat[::-1]
-                nowe = ''
-                for i in range(len(odw)):
-                    if int(odw[i]) < 10:
-                        odw[i] = '0{}'.format(odw[i])
-                    nowe += odw[i]
-                dane = gotowe + nowe
-                return dane
+                    #ile_przed +=1   
+                    #z+=1
+                    day_before -=1
+                    data_before = '{}.{}.{}'.format(day_before, month, self.year)
 
-            else:
-                a += 1
+        else:
+            z=1
+            ile_przed = 0
+            for i in range(int(self.month) - 1):
+                ile_przed += self.ilosc[str(i + 1)]
+            for i in range(self.day):
+                dzien = i + 1
+                #print(data)
+                data = '{}.{}.{}'.format(dzien, self.month, self.year)
+                if self.czy_wolne(str(data)) and int(dzien) < int(self.day):
+                    ile_przed += 1
+                elif int(dzien) >= int(self.day):
+                    #dt = datetime.date(self.day, self.month, self.year).weekday()
+                    dt = calendar.weekday(self.year,self.month,self.day)
+                    if dt  == 5:
+                        z = 1
+                        #ile_przed -=1
+                    elif dt == 6:
+                        z = 2
+                    elif dt == 0:
+                        z = 3
+                    data = '{}.{}.{}'.format(str(int(dzien)-z), self.month, self.year)
+                    if ile_przed < 10:
+                        kod = 'a00{}z'
+                    elif ile_przed < 100:
+                        kod = 'a0{}z'
+                    else:
+                        kod = 'a{}z'
+                    gotowe = kod.format(ile_przed)
+                    
+                    dat = data.split('.')
+                    odw = dat[::-1]
+                    nowe = ''
+                    for i in range(len(odw)):
+                        if int(odw[i]) < 10:
+                            odw[i] = '0{}'.format(odw[i])
+                        nowe += odw[i]
+                    dane = gotowe + nowe
+                    print(dane)
+                    print(ile_przed)
+                    return dane
 
-
-class Pobierz():  # pojedyncze pobranie
+class Pobierz:  # pojedyncze pobranie
     def __init__(self, daty):
         self.daty = daty  # wszystkie daty
         self.lista = []  # lista kursów
@@ -128,7 +180,7 @@ class Pobierz():  # pojedyncze pobranie
         return self.lista
 
 
-class Output():
+class Output:
     def __init__(self, kwota, lista, daty):
         self.kwota = kwota  # kurs
         self.lista = lista  # lista kwot do przeliczenia
@@ -149,17 +201,88 @@ class Output():
             output = output.append(
                 {'data': self.daty[i], 'PLN': self.lista[i], 'kurs': self.kwota[i], 'euro': self.przeliczone[i]},
                 ignore_index=True)
-        output.to_csv('kwoty.csv', index=False)
+        path =r'C:/Users/Adam/'
+        output.to_csv(path + 'kwoty.csv', index=False)
         return output
 
 
+#------------------------------------------------------ window ------------------------------------------------------
+class Window:
+    def __init__(self):
+        root = tk.Tk()
+        self.data = []
+        self.start(root)
+        #print(amount, date)
+        #print(self.data)
+        root.mainloop()
+    
+    def retdan(self):
+        return self.data
+    
+    def start(self,root):
+        label1 = tk.Label(text='Proszę wpisać datę')
+        label2 = tk.Label(text='Proszę wpisać kwotę')
+        entry1 = tk.Entry()
+        entry2 = tk.Entry()
+        label1.pack()
+        entry1.pack()
+        label2.pack()
+        entry2.pack()
+        button = tk.Button(
+        master = root,
+        text="Click me!",
+        width=25,
+        height=5,
+        bg="blue",
+        fg="yellow",
+        command =lambda: self.data.append(self.get_input(entry1,entry2))
+        )
+        button.pack()
+        
+        button_eit = tk.Button(
+        master = root,
+        text="exit",
+        width=25,
+        height=5,
+        bg="blue",
+        fg="yellow",
+        command =lambda: root.destroy()
+        )
+        button_eit.pack()
+
+
+    def zamien(self):
+        plik = open('nowy.txt','w+')
+        for i in self.data:
+            plik.write(i+'\n')
+        #plik.writelines(self.data)
+        plik.close()
+
+
+    def get_input(self,entry1,entry2):
+        napis = ''
+        date = entry1.get()
+        amount = entry2.get()
+        napis += date +','+amount
+        return napis
+        
+
+
+
+#------------------------------------------------------ end ------------------------------------------------------
+
 def main(plik):
+    window = Window()
+    print(window.retdan())
+    window.zamien()
     wejscie = Input(plik)
     wejscie_zamiana = wejscie.zamien()
     pobranie = Pobierz(wejscie.podaj_daty())
     for i in range(len(wejscie_zamiana)):
         pobranie.sciagnij(wejscie.podaj_daty()[i])
-        time.sleep(0.1)
     kursy = pobranie.podaj()
     output = Output(kursy, wejscie.podaj_kwoty(), wejscie.podaj_daty())
     return output.do_pliku()
+    #sys.exit(app.exec_())
+#main('C:/Users/Adam/text.txt')
+main('nowy.txt')
